@@ -1,0 +1,5 @@
+haselcast:
+  network:
+    join:
+      multicast:
+        enabled: true
