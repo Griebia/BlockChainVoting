@@ -4,9 +4,9 @@ import java.util.ArrayList;
 //import java.util.Base64;
 import java.util.HashMap;
 //import com.google.gson.GsonBuilder;
-import java.util.Map;
 
-public class NoobChain {
+
+public class BlockChain {
 	
 	public static ArrayList<Block> blockchain = new ArrayList<Block>();
 	public static HashMap<String,TransactionOutput> UTXOs = new HashMap<String,TransactionOutput>();
@@ -22,9 +22,9 @@ public class NoobChain {
 		Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider()); //Setup Bouncey castle as a Security Provider
 		
 		//Create wallets:
-		walletA = new Wallet();
-		walletB = new Wallet();		
-		Wallet coinbase = new Wallet();
+		walletA = new Wallet(false);
+		walletB = new Wallet(false);
+		Wallet coinbase = new Wallet(false);
 		
 		//create genesis transaction, which sends 100 NoobCoin to walletA: 
 		genesisTransaction = new Transaction(coinbase.publicKey, walletA.publicKey, 100f, null);

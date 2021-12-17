@@ -32,13 +32,13 @@ public class Transaction {
 				
 		//Gathers transaction inputs (Making sure they are unspent):
 		for(TransactionInput i : inputs) {
-			i.UTXO = NoobChain.UTXOs.get(i.transactionOutputId);
+			i.UTXO = BlockChain.UTXOs.get(i.transactionOutputId);
 		}
 
 		//Checks if transaction is valid:
-		if(getInputsValue() < NoobChain.minimumTransaction) {
+		if(getInputsValue() < BlockChain.minimumTransaction) {
 			System.out.println("Transaction Inputs too small: " + getInputsValue());
-			System.out.println("Please enter the amount greater than " + NoobChain.minimumTransaction);
+			System.out.println("Please enter the amount greater than " + BlockChain.minimumTransaction);
 			return false;
 		}
 		
@@ -50,13 +50,13 @@ public class Transaction {
 				
 		//Add outputs to Unspent list
 		for(TransactionOutput o : outputs) {
-			NoobChain.UTXOs.put(o.id , o);
+			BlockChain.UTXOs.put(o.id , o);
 		}
 		
 		//Remove transaction inputs from UTXO lists as spent:
 		for(TransactionInput i : inputs) {
 			if(i.UTXO == null) continue; //if Transaction can't be found skip it 
-			NoobChain.UTXOs.remove(i.UTXO.id);
+			BlockChain.UTXOs.remove(i.UTXO.id);
 		}
 		
 		return true;
