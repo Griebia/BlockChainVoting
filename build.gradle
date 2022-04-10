@@ -17,7 +17,8 @@ dependencies {
     implementation 'com.hazelcast:hazelcast:5.0'
     implementation 'org.springframework.boot:spring-boot-starter-cache'
     implementation 'org.springframework.boot:spring-boot-starter-web'
-
+    implementation 'org.immutables:value:2.8.2'
+    implementation ('org.web3j:core:4.8.7')
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.2'

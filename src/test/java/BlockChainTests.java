@@ -1,4 +1,5 @@
 import org.junit.jupiter.api.Test;
+import voting.Block;
 
 import java.util.ArrayList;
 import java.util.Date;

@@ -2,13 +2,14 @@ package voting;
 
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 public class Block {
 	
 	public String hash;
 	public String previousHash; 
 	public String merkleRoot;
-	public ArrayList<Transaction> transactions = new ArrayList<Transaction>(); //our data will be a simple message.
+	public List<Transaction> transactions = new ArrayList<Transaction>(); //our data will be a simple message.
 	public long timeStamp; //as number of milliseconds since 1/1/1970.
 	public int nonce;
 	
@@ -22,13 +23,13 @@ public class Block {
 	
 	//Calculate new hash based on blocks contents
 	public String calculateHash() {
-		String calculatedhash = StringUtil.applySha256( 
+		String calculatedHash = StringUtil.applySha256(
 				previousHash +
 				Long.toString(timeStamp) +
 				Integer.toString(nonce) + 
 				merkleRoot
 				);
-		return calculatedhash;
+		return calculatedHash;
 	}
 	
 	//Increases nonce value until hash target is reached.
@@ -57,5 +58,5 @@ public class Block {
 		System.out.println("Transaction Successfully added to Block");
 		return true;
 	}
-	
+
 }
