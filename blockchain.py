@@ -34,6 +34,7 @@ class BlockChain(object):
         block = {
             'index': len(self.chain) + 1,
             'timestamp': time(),
+            'candidates': self.candidates,
             'transactions': self.current_transactions,
             'proof': proof,
             'previous_hash': previous_hash or self.hash(self.chain[-1]),
@@ -58,6 +59,16 @@ class BlockChain(object):
             "sender": sender,
             "recipient": recipient,
             "data": amount,
+        })
+        return int(self.last_block['index']) + 1
+
+    def new_candidate(self, name, wallet):
+        if self.started_voting:
+            return -1;
+
+        self.candidates.append({
+            "name": name,
+            "wallet": wallet
         })
         return int(self.last_block['index']) + 1
 
@@ -96,15 +107,6 @@ class BlockChain(object):
     def full_chain(self):
         # xxx returns the full chain and a number of blocks
         pass
-
-    def proof_of_work(self, last_proof):
-        # simple proof of work algorithm
-        # find a number p' such as hash(pp') containing leading 4 zeros where p is the previous p'
-        # p is the previous proof and p' is the new proof
-        proof = 0
-        while self.validate_proof(last_proof, proof) is False:
-            proof += 1
-        return proof
 
     def valid_chain(self, chain):
 
@@ -217,6 +219,28 @@ def new_transaction():
     return jsonify(response, 200)
 
 
+@app.route('/candidate/new', methods=['POST'])
+def new_candidate():
+    values = request.get_json()
+    required = ['name', 'hash']
+
+    if not all(k in values for k in required):
+        return 'Missing values.', 400
+
+    if blockchain.started_voting:
+        return 'Vote has already started, adding candidates is not allowed', 400
+
+    index = blockchain.new_candidate(
+        name=values['name'],
+        hash=values['hash']
+    )
+
+    response = {
+        'message': f'Candidate will be added to the Block {index}',
+    }
+    return jsonify(response, 200)
+
+
 @app.route('/startvote', methods=['GET'])
 def start_vote():
     blockchain.start_voting()
@@ -227,8 +251,8 @@ def start_vote():
 
 
 @app.route('/endvote', methods=['GET'])
-def start_vote():
-    blockchain.start_voting()
+def end_vote():
+    blockchain.ended_voting()
     response = {
         'message': f'Ended the vote!',
     }
