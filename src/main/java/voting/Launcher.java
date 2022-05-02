@@ -9,6 +9,5 @@ import org.springframework.cache.annotation.EnableCaching;
 public class Launcher {
     public static void main(String[] args) {
         SpringApplication.run(Launcher.class, args);
-        BlockChain.main(args);
     }
 }
