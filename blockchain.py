@@ -145,6 +145,9 @@ class BlockChain(object):
             "recipient": transaction.receiver_address
         })
 
+        voter['voted'] = True
+        self.voters.append(voter)
+
         self.mine()
 
         return True, None
@@ -196,7 +199,6 @@ class BlockChain(object):
         self.voters.append({
             "public_key": public_key.decode("utf-8"),
             "wallet_address": wallet_address.decode("utf-8"),
-            "voted": False
         })
 
         self.mine()
@@ -332,16 +334,21 @@ class BlockChain(object):
 
     def get_all_voters(self):
         voters = []
+        transactions = self.get_all_transactions()
         for block in self.chain:
-            for transaction in block['voters']:
-                voters.append(transaction)
+            for voter in block['voters']:
+                if any(elem['sender'] == voter['wallet_address'] for elem in transactions):
+                    voter["voted"] = True
+                else:
+                    voter["voted"] = False
+                voters.append(voter)
 
         return voters
 
     def get_all_candidates(self):
         candidates = []
         for block in self.chain:
-            for transaction in block['candidates']:
-                candidates.append(transaction)
+            for candidate in block['candidates']:
+                candidates.append(candidate)
 
         return candidates

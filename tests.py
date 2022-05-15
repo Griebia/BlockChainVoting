@@ -1,7 +1,7 @@
 import unittest
 
-
 from main import *
+
 
 class TestBlockChain(unittest.TestCase):
 
@@ -11,40 +11,48 @@ class TestBlockChain(unittest.TestCase):
 
     def test_start_vote(self):
         blockchain = BlockChain()
-        blockchain.start_voting()
+        f = open("private.pem", "r");
+        private_key = RSA.importKey(f.read())
+        signature = TestBlockChain.sign("StartVote".encode('utf-8'), private_key)
+
+        blockchain.start_voting(signature, "StartVote".encode('utf-8'))
         self.assertEqual(blockchain.started_voting, True)
 
     def test_end_vote_when_not_started(self):
         blockchain = BlockChain()
-        blockchain.end_voting()
+        f = open("private.pem", "r");
+        private_key = RSA.importKey(f.read())
+        signature = TestBlockChain.sign("EndVote".encode('utf-8'), private_key)
+
+        blockchain.end_voting(signature, "EndVote".encode('utf-8'))
         self.assertEqual(blockchain.ended_voting, False)
 
     def test_add_transaction_to_be_voted_simple(self):
         blockchain = BlockChain()
-        blockchain.new_candidate("First", "wallet")
+        name = 'First'
+
+        f = open("private.pem", "r");
+        private_key = RSA.importKey(f.read())
+        signature = TestBlockChain.sign(name.encode('utf-8'), private_key)
+        candidate_wallet = blockchain.new_candidate(name.encode('utf-8'), signature)
         blockchain.started_voting = True
         private_key, public_key, wallet_address = blockchain.new_voter()
-        transaction = Transaction(wallet_address, "wallet")
+        transaction = Transaction(wallet_address, candidate_wallet)
         transaction.sign(private_key)
 
         blockchain.new_transaction(transaction)
         last_transactions = blockchain.chain[-1]['transactions']
         self.assertEqual(len(last_transactions), 1)
 
-    @staticmethod
-    def sign(data, private_key):
-        hash_object = SHA256.new(data)
-        signature = pkcs1_15.new(private_key).sign(hash_object)
-        return signature
-
     def test_add_transaction_to_be_voted(self):
         blockchain = BlockChain()
 
+        name = 'First'
+
         f = open("private.pem", "r");
         private_key = RSA.importKey(f.read())
-
-        signature = self.sign("First".encode('utf_8'), private_key)
-        candidate_wallet = blockchain.new_candidate("First".encode('utf_8'), signature)
+        signature = TestBlockChain.sign(name.encode('utf-8'), private_key)
+        candidate_wallet = blockchain.new_candidate(name.encode('utf-8'), signature)
 
         blockchain.started_voting = True
 
@@ -60,12 +68,38 @@ class TestBlockChain(unittest.TestCase):
         print(blockchain.get_all_transactions())
         self.assertEqual(len(blockchain.get_all_transactions()), 2)
 
+    def test_add_transaction_to_be_voted_by_the_same_voter(self):
+        blockchain = BlockChain()
+
+        name = 'First'
+
+        f = open("private.pem", "r");
+        private_key = RSA.importKey(f.read())
+        signature = TestBlockChain.sign(name.encode('utf-8'), private_key)
+        candidate_wallet = blockchain.new_candidate(name.encode('utf-8'), signature)
+
+        blockchain.started_voting = True
+
+        private_key, public_key, wallet_address = blockchain.new_voter()
+        transaction = Transaction(wallet_address, candidate_wallet)
+        transaction.sign(private_key)
+        blockchain.new_transaction(transaction)
+
+        blockchain.new_transaction(transaction)
+
+        self.assertEqual(len(blockchain.get_all_transactions()), 1)
+
     def test_add_transaction_with_wrong_signature(self):
         blockchain = BlockChain()
-        blockchain.new_candidate("First", "wallet")
+        name = 'First'
+
+        f = open("private.pem", "r");
+        private_key = RSA.importKey(f.read())
+        signature = TestBlockChain.sign(name.encode('utf-8'), private_key)
+        candidate_wallet = blockchain.new_candidate(name.encode('utf-8'), signature)
         blockchain.started_voting = True
         private_key, public_key, wallet_address = blockchain.new_voter()
-        transaction = Transaction(wallet_address, "wallet")
+        transaction = Transaction(wallet_address, candidate_wallet)
         transaction.sign(private_key)
         transaction.signature = transaction.signature[:-1]
 
@@ -73,6 +107,20 @@ class TestBlockChain(unittest.TestCase):
             blockchain.new_transaction(transaction)
         except ValueError as e:
             self.assertEqual(type(e), ValueError)
+
+    @staticmethod
+    def sign(data, private_key):
+        hash_object = SHA256.new(data)
+        signature = pkcs1_15.new(private_key).sign(hash_object)
+        return signature
+
+    @staticmethod
+    def create_candidate(name):
+        f = open("private.pem", "r");
+        private_key = RSA.importKey(f.read())
+
+        signature = TestBlockChain.sign(name.encode('utf-8'), private_key)
+        return blockchain.new_candidate(name.encode('utf-8'), signature)
 
 
 class TestCommunication(unittest.TestCase):
@@ -104,4 +152,3 @@ class TestCommunication(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-
