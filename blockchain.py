@@ -29,21 +29,23 @@ class Transaction:
         transaction_data = self.generate_data()
         hash_object = SHA256.new(transaction_data)
         self.signature = pkcs1_15.new(private_key).sign(hash_object)
+        print(self.signature)
         return binascii.hexlify(self.signature).decode("utf-8")
 
     @staticmethod
     def generate_transaction_data(sender_address, receiver_address) -> dict:
         return {
-            "sender": sender_address,
             "receiver": receiver_address,
+            "sender": sender_address,
         }
 
     @staticmethod
     def convert_transaction_data_to_bytes(transaction_data: dict):
         new_transaction_data = transaction_data.copy()
-        new_transaction_data["sender"] = str(transaction_data["sender"])
         new_transaction_data["receiver"] = str(transaction_data["receiver"])
-        return json.dumps(new_transaction_data, indent=2).encode('utf-8')
+        new_transaction_data["sender"] = str(transaction_data["sender"])
+        print(json.dumps(new_transaction_data).replace(" ", ""))
+        return json.dumps(new_transaction_data).replace(" ", "").encode('utf-8')
 
 
 class BlockChain(object):
@@ -66,6 +68,38 @@ class BlockChain(object):
 
         public_key = private_key.publickey().export_key()
         self.admin = public_key
+
+        # Testing
+        self.current_transactions.append({
+            "sender": "First address",
+            "receiver": "Candidate address"
+        })
+
+        self.current_transactions.append({
+            "sender": "Second address",
+            "receiver": "Candidate address"
+        })
+
+        self.voters.append(
+            {
+                "public_key": self.admin.decode(),
+                "wallet_address": "a",
+            }
+        )
+
+        self.candidates.append({
+            "name": "a",
+            "wallet_address": "a"
+        })
+
+        signature = Transaction('a', 'a').sign(private_key)
+
+        print(signature)
+
+        signature = Transaction('a', 'a').sign(private_key)
+
+        print(signature)
+
 
         # create the genesis block
         self.new_block(previous_hash=1, proof=100)
@@ -138,11 +172,13 @@ class BlockChain(object):
         if current_candidate is None:
             return False, "Candidate is not present in the given vote"
 
-        self.validate_signature(voter['public_key'], transaction.signature, transaction.generate_data())
+        signature_byte = binascii.unhexlify(transaction.signature)
+
+        self.validate_signature(voter['public_key'], signature_byte, transaction.generate_data())
 
         self.current_transactions.append({
             "sender": transaction.sender_address,
-            "recipient": transaction.receiver_address
+            "receiver": transaction.receiver_address
         })
 
         voter['voted'] = True

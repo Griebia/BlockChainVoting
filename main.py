@@ -10,7 +10,7 @@ blockchain = BlockChain()
 @app.route('/transaction/new', methods=['POST'])
 def new_transaction():
     values = request.get_json()
-    required = ['signature', 'sender', 'recipient']
+    required = ['signature', 'sender', 'receiver']
 
     if not all(k in values for k in required):
         return 'Missing values.', 400
@@ -20,7 +20,7 @@ def new_transaction():
 
     # create a new transaction
     result, message = blockchain.new_transaction(
-        Transaction(values['sender'], values['recipient'], values['signature'])
+        Transaction(values['sender'], values['receiver'], values['signature'])
     )
 
     if result:
@@ -36,7 +36,7 @@ def new_transaction():
 
 @app.route('/transaction/all', methods=['GET'])
 def get_all_transactions():
-    return jsonify(blockchain.get_all_transactions(), 500)
+    return jsonify(blockchain.get_all_transactions())
 
 
 @app.route('/candidate/new', methods=['POST'])
