@@ -7,57 +7,42 @@ node_identifier = str(uuid4()).replace('-', '')
 # initiate the Blockchain
 blockchain = BlockChain()
 
-
-@staticmethod
-def validate_signature(public_key: bytes, signature: bytes, transaction_data: bytes):
-    public_key_object = RSA.import_key(public_key)
-    transaction_hash = SHA256.new(transaction_data)
-    pkcs1_15.new(public_key_object).verify(transaction_hash, signature)
-
-
-
-# @app.route('/mine', methods=['GET'])
-# def mine():
-#     block = blockchain.mine()
-#
-#     response = {
-#         'message': "Forged new block.",
-#         'index': block['index'],
-#         'transactions': block['transactions'],
-#         'proof': block['proof'],
-#         'previous_hash': block['previous_hash'],
-#     }
-#     return jsonify(response, 200)
-
-
 @app.route('/transaction/new', methods=['POST'])
 def new_transaction():
     values = request.get_json()
-    required = ['sender', 'recipient', 'amount']
-
-    if blockchain.started_voting and not blockchain.ended_voting:
-        return 'Voting is not allowed now', 400
+    required = ['signature', 'sender', 'recipient']
 
     if not all(k in values for k in required):
         return 'Missing values.', 400
 
+    if blockchain.started_voting and not blockchain.ended_voting:
+        return 'Voting is not allowed now', 400
+
     # create a new transaction
-    index = blockchain.new_transaction(
-        sender=values['sender'],
-        recipient=values['recipient'],
-        amount=values['amount']
+    result, message = blockchain.new_transaction(
+        Transaction(values['sender'], values['recipient'], values['signature'])
     )
 
+    if result:
+        response = {
+            'message': f'Transaction has been added to the blockchain',
+        }
+        return jsonify(response, 200)
+
     response = {
-        'message': f'Transaction will be added to the Block {index}',
+        'error_message': f'{message}',
     }
-    return jsonify(response, 200)
+    return jsonify(response, 500)
+
+@app.route('/transaction/all', methods=['GET'])
+def get_all_transactions():
+    return jsonify(blockchain.get_all_transactions(), 500)
 
 
 @app.route('/candidate/new', methods=['POST'])
 def new_candidate():
     values = request.get_json()
-    required = ['name', 'hash']
+    required = ['name', 'signature']
 
     if not all(k in values for k in required):
         return 'Missing values.', 400
@@ -65,14 +50,15 @@ def new_candidate():
     if blockchain.started_voting:
         return 'Vote has already started, adding candidates is not allowed', 400
 
-    index = blockchain.new_candidate(
+    wallet = blockchain.new_candidate(
         name=values['name'],
-        hash=values['hash']
+        hash=values['signature']
     )
 
     response = {
-        'message': f'Candidate will be added to the Block {index}',
+        'wallet': wallet
     }
+
     return jsonify(response, 200)
 
 
@@ -92,9 +78,16 @@ def new_voter():
     return jsonify(response, 200)
 
 
-@app.route('/startvote', methods=['GET'])
+@app.route('/startvote', methods=['POST'])
 def start_vote():
-    blockchain.start_voting()
+    values = request.get_json()
+    required = ['signature', 'data']
+
+    if not all(k in values for k in required):
+        return 'Missing values.', 400
+
+
+    result = blockchain.start_voting(values['signature'], values['data'])
     response = {
         'message': f'Started the vote!',
     }
@@ -141,7 +134,6 @@ def register_nodes():
 
     return jsonify(response), 201
 
-
 @app.route('/miner/nodes/resolve', methods=['GET'])
 def consensus():
     # an attempt to resolve conflicts to reach the consensus
@@ -160,9 +152,24 @@ def consensus():
     }
     return jsonify(response), 200
 
+@app.route('/candidate/results', methods=['GET'])
+def candidate_result():
+    response = {
+        'message': 'Results are returned',
+        'candidate_gotten_votes': blockchain.candidate_votes(),
+    }
+    return jsonify(response), 200
+
+
+
 
 if __name__ == '__main__':
     defPort = 5000
+    mainNodePassword = "Node"
+
     if len(sys.argv) > 1:
         defPort = sys.argv[1]
+
+    blockchain = BlockChain()
+
     app.run(host='0.0.0.0', port=defPort)

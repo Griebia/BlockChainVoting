@@ -1,10 +1,11 @@
 import hashlib
 import json
 import sys
+from collections import Counter
 from time import time
 from uuid import uuid4
 from urllib.parse import urlparse
-
+import binascii
 import requests
 from flask import Flask, jsonify, request
 
@@ -12,6 +13,38 @@ import base58
 from Crypto.PublicKey import RSA
 from Crypto.Hash import RIPEMD160, SHA256
 from Crypto.Signature import pkcs1_15
+
+
+class Transaction:
+    def __init__(self, sender_address: bytes, receiver_address: bytes, signature: str = ""):
+        self.sender_address = sender_address
+        self.receiver_address = receiver_address
+        self.signature = signature
+
+    def generate_data(self) -> bytes:
+        transaction_data = self.generate_transaction_data(self.sender_address, self.receiver_address)
+        return self.convert_transaction_data_to_bytes(transaction_data)
+
+    def sign(self, private_key):
+        transaction_data = self.generate_data()
+        hash_object = SHA256.new(transaction_data)
+        self.signature = pkcs1_15.new(private_key).sign(hash_object)
+        return binascii.hexlify(self.signature).decode("utf-8")
+
+    @staticmethod
+    def generate_transaction_data(sender_address, receiver_address) -> dict:
+        return {
+            "sender": sender_address,
+            "receiver": receiver_address,
+        }
+
+    @staticmethod
+    def convert_transaction_data_to_bytes(transaction_data: dict):
+        new_transaction_data = transaction_data.copy()
+        new_transaction_data["sender"] = str(transaction_data["sender"])
+        new_transaction_data["receiver"] = str(transaction_data["receiver"])
+        return json.dumps(new_transaction_data, indent=2).encode('utf-8')
+
 
 class BlockChain(object):
     """ Main BlockChain class """
@@ -24,6 +57,16 @@ class BlockChain(object):
         self.nodes = set()
         self.started_voting = False
         self.ended_voting = False
+
+        private_key = RSA.generate(2048)
+
+        f = open('private.pem', 'wb')
+        f.write(private_key.export_key('PEM'))
+        f.close()
+
+        public_key = private_key.publickey().export_key()
+        self.admin = public_key
+
         # create the genesis block
         self.new_block(previous_hash=1, proof=100)
 
@@ -37,8 +80,10 @@ class BlockChain(object):
     def new_block(self, proof, previous_hash=None):
         # creates a new block in the blockchain
         block = {
+            'admin': self.admin.decode("utf-8"),
             'index': len(self.chain) + 1,
             'timestamp': time(),
+            'voters': self.voters,
             'candidates': self.candidates,
             'transactions': self.current_transactions,
             'proof': proof,
@@ -48,6 +93,8 @@ class BlockChain(object):
         }
 
         # reset the current list of transactions
+        self.voters = []
+        self.candidates = []
         self.current_transactions = []
         self.chain.append(block)
         return block
@@ -57,26 +104,73 @@ class BlockChain(object):
         # returns last block in the chain
         return self.chain[-1]
 
-    def new_transaction(self, sender, recipient, amount):
+    @staticmethod
+    def validate_signature(public_key: bytes, signature: bytes, data: bytes):
+        public_key_object = RSA.import_key(public_key)
+        data_hash = SHA256.new(data)
+        pkcs1_15.new(public_key_object).verify(data_hash, signature)
+
+    def new_transaction(self, transaction: Transaction):
         # adds a new transaction into the list of transactions
         # these transactions go into the next mined block
-        self.current_transactions.append({
-            "sender": sender,
-            "recipient": recipient,
-            "data": amount,
-        })
-        return int(self.last_block['index']) + 1
+        if not self.started_voting and self.ended_voting:
+            return False, "The vote is not started or ended"
 
-    def new_candidate(self, name, wallet):
+        current_voter = None
+
+        for voter in self.get_all_voters():
+            if voter['wallet_address'] == transaction.sender_address:
+                current_voter = voter
+                break
+
+        if current_voter is None:
+            return False, "This kind of voter is not present"
+
+        if current_voter['voted']:
+            return False, "This voter has already voted"
+
+        current_candidate = None
+        for candidate in self.get_all_candidates():
+            if candidate['wallet_address'] == transaction.receiver_address:
+                current_candidate = candidate
+                break
+
+        if current_candidate is None:
+            return False, "Candidate is not present in the given vote"
+
+        self.validate_signature(voter['public_key'], transaction.signature, transaction.generate_data())
+
+        self.current_transactions.append({
+            "sender": transaction.sender_address,
+            "recipient": transaction.receiver_address
+        })
+
+        self.mine()
+
+        return True, None
+
+    def new_candidate(self, name, signature):
         if self.started_voting:
             return -1;
 
-        self.candidates.append({
-            "name": name,
-            "wallet": wallet
-        })
-        return int(self.last_block['index']) + 1
+        self.validate_signature(self.admin.decode('utf-8'), signature, name)
 
+        private_key = RSA.generate(2048)
+        public_key = private_key.publickey().export_key()
+        hash_1 = self.calculate_hash(public_key, hash_function="sha256")
+        hash_2 = self.calculate_hash(hash_1, hash_function="ripemd160")
+        wallet_address = base58.b58encode(hash_2)
+
+        self.candidates.append({
+            "name": name.decode("utf-8"),
+            "wallet_address": wallet_address.decode('utf-8')
+        })
+
+        self.mine()
+
+        return wallet_address.decode('utf-8')
+
+    @staticmethod
     def calculate_hash(data, hash_function: str = "sha256"):
         if type(data) == str:
             data = bytearray(data, "utf-8")
@@ -90,7 +184,7 @@ class BlockChain(object):
             return h.hexdigest()
 
     def new_voter(self):
-        if self.started_voting:
+        if not self.started_voting:
             return -1
 
         private_key = RSA.generate(2048)
@@ -100,12 +194,14 @@ class BlockChain(object):
         wallet_address = base58.b58encode(hash_2)
 
         self.voters.append({
-            "public_key": public_key,
-            "wallet_address": wallet_address,
+            "public_key": public_key.decode("utf-8"),
+            "wallet_address": wallet_address.decode("utf-8"),
             "voted": False
         })
 
-        return private_key, public_key, wallet_address
+        self.mine()
+
+        return private_key, public_key, wallet_address.decode('utf-8')
 
     def mine(self):
         # first we need to run the proof of work algorithm to calculate the new proof..
@@ -119,13 +215,16 @@ class BlockChain(object):
         self.inform_of_change()
         return block
 
-    def start_voting(self):
+    def start_voting(self, signature, data):
+        self.validate_signature(self.admin, signature, data)
         self.started_voting = True
         self.mine()
+
         return True
 
-    def end_voting(self):
+    def end_voting(self, signature, data):
         if self.started_voting:
+            self.validate_signature(self.admin, signature, data)
             self.ended_voting = True
             self.mine()
         else:
@@ -215,8 +314,34 @@ class BlockChain(object):
 
         # grab and verify chains from all the nodes in our network
         for node in neighbours:
-
             # we utilize our own api to construct the list of chains :)
             response = requests.get(f'http://{node}/miner/nodes/resolve')
 
         return False
+
+    def candidate_votes(self):
+        return Counter(self.candidates)
+
+    def get_all_transactions(self):
+        transactions = []
+        for block in self.chain:
+            for transaction in block['transactions']:
+                transactions.append(transaction)
+
+        return transactions
+
+    def get_all_voters(self):
+        voters = []
+        for block in self.chain:
+            for transaction in block['voters']:
+                voters.append(transaction)
+
+        return voters
+
+    def get_all_candidates(self):
+        candidates = []
+        for block in self.chain:
+            for transaction in block['candidates']:
+                candidates.append(transaction)
+
+        return candidates
