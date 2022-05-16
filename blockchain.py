@@ -145,7 +145,8 @@ class BlockChain(object):
         if self.started_voting:
             return -1;
 
-        self.validate_signature(self.admin.decode('utf-8'), signature, name)
+        signature_byte = binascii.unhexlify(signature)
+        self.validate_signature(self.admin.decode('utf-8'), signature_byte, name.encode('utf-8'))
 
         private_key = RSA.generate(2048)
         public_key = private_key.publickey().export_key()
@@ -154,7 +155,7 @@ class BlockChain(object):
         wallet_address = base58.b58encode(hash_2)
 
         self.candidates.append({
-            "name": name.decode("utf-8"),
+            "name": name,
             "wallet_address": wallet_address.decode('utf-8')
         })
 
@@ -176,7 +177,7 @@ class BlockChain(object):
             return h.hexdigest()
 
     def new_voter(self):
-        if not self.started_voting:
+        if self.started_voting:
             return -1
 
         private_key = RSA.generate(2048)
@@ -192,7 +193,7 @@ class BlockChain(object):
 
         self.mine()
 
-        return private_key, public_key, wallet_address.decode('utf-8')
+        return private_key, public_key.decode("utf-8"), wallet_address.decode('utf-8')
 
     def mine(self):
         # first we need to run the proof of work algorithm to calculate the new proof..
@@ -206,16 +207,18 @@ class BlockChain(object):
         self.inform_of_change()
         return block
 
-    def start_voting(self, signature, data):
-        self.validate_signature(self.admin, signature, data)
+    def start_voting(self, signature: str, data: str):
+        signature_byte = binascii.unhexlify(signature)
+        self.validate_signature(self.admin, signature_byte, data.encode('utf-8'))
         self.started_voting = True
         self.mine()
 
         return True
 
-    def end_voting(self, signature, data):
+    def end_voting(self, signature: str, data: str):
         if self.started_voting:
-            self.validate_signature(self.admin, signature, data)
+            signature_byte = binascii.unhexlify(signature)
+            self.validate_signature(self.admin, signature_byte, data.encode('utf-8'))
             self.ended_voting = True
             self.mine()
         else:

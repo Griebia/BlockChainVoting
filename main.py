@@ -51,15 +51,15 @@ def new_candidate():
         return 'Vote has already started, adding candidates is not allowed', 400
 
     wallet = blockchain.new_candidate(
-        name=values['name'],
-        hash=values['signature']
+        values['name'],
+        values['signature']
     )
 
     response = {
         'wallet': wallet
     }
 
-    return jsonify(response, 200)
+    return jsonify(response)
 
 
 @app.route('/voter/new', methods=['GET'])
@@ -70,12 +70,12 @@ def new_voter():
     private_key, public_key, wallet = blockchain.new_voter()
 
     response = {
-        'private_key': private_key,
+        'private_key': private_key.export_key('PEM').decode('utf-8'),
         'public_key': public_key,
         'wallet': wallet
     }
 
-    return jsonify(response, 200)
+    return jsonify(response)
 
 
 @app.route('/startvote', methods=['POST'])
@@ -94,9 +94,21 @@ def start_vote():
     return jsonify(response, 200)
 
 
-@app.route('/endvote', methods=['GET'])
+@app.route('/endvote', methods=['POST'])
 def end_vote():
-    blockchain.ended_voting()
+    values = request.get_json()
+    required = ['signature', 'data']
+
+    if not all(k in values for k in required):
+        return 'Missing values.', 400
+
+    result = blockchain.end_voting(values['signature'], values['data'])
+    if not result:
+        response = {
+            'message': f'Could no end the vote',
+        }
+        return jsonify(response, 400)
+
     response = {
         'message': f'Ended the vote!',
     }
