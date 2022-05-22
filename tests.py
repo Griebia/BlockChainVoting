@@ -1,4 +1,5 @@
 import unittest
+import time
 
 from main import *
 
@@ -107,6 +108,39 @@ class TestBlockChain(unittest.TestCase):
             blockchain.new_transaction(transaction)
         except ValueError as e:
             self.assertEqual(type(e), ValueError)
+
+
+
+    def test_add_transaction_to_be_voted_x_times(self):
+        nodes = set()
+        for x in range(5001, 5007):
+            nodes.add("localhost:" + str(x))
+        blockchain = BlockChain(nodes)
+
+        candidate_wallet = "Candidate1"
+
+        transactions = set()
+        for x in range(0,100):
+            private_key, public_key, wallet_address = blockchain.new_voter()
+            transaction = Transaction(wallet_address, candidate_wallet)
+            transaction.sign(private_key)
+
+            transactions.add(transaction)
+
+        blockchain.started_voting = True
+        times = set()
+        for transaction in transactions:
+            start = time.time()
+            blockchain.new_transaction(transaction)
+            end = time.time()
+            times.add(end - start)
+
+        with open('TimeResult.txt', 'w') as f:
+            for item in times:
+                f.write("%s\n" % item)
+
+        print(blockchain.get_all_transactions())
+        self.assertEqual(len(blockchain.get_all_transactions()), 10)
 
     @staticmethod
     def sign(data, private_key):

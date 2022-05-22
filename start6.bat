@@ -1,0 +1,1 @@
+start /B python main.py 5007

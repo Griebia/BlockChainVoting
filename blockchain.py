@@ -4,58 +4,32 @@ from transaction import *
 class BlockChain(object):
     """ Main BlockChain class """
 
-    def __init__(self):
+    def __init__(self, nodes=set()):
         self.chain = []
         self.current_transactions = []
         self.candidates = []
         self.voters = []
-        self.nodes = set()
+        self.nodes = nodes
         self.started_voting = False
         self.ended_voting = False
 
-        private_key = RSA.generate(2048)
-
-        f = open('private.pem', 'wb')
-        f.write(private_key.export_key('PEM'))
-        f.close()
-
-        public_key = private_key.publickey().export_key()
-        self.admin = public_key
-
-        # Testing
-        self.current_transactions.append({
-            "sender": "First address",
-            "receiver": "Candidate address"
-        })
-
-        self.current_transactions.append({
-            "sender": "Second address",
-            "receiver": "Candidate address"
-        })
-
-        self.voters.append(
-            {
-                "public_key": self.admin.decode(),
-                "wallet_address": "a",
-            }
-        )
-
+        self.resolve_conflicts()
         self.candidates.append({
-            "name": "a",
-            "wallet_address": "a"
+            "name": "Candidate1",
+            "wallet_address": "Candidate1"
         })
-
-        signature = Transaction('a', 'a').sign(private_key)
-
-        print(signature)
-
-        signature = Transaction('a', 'a').sign(private_key)
-
-        print(signature)
-
-
         # create the genesis block
-        self.new_block(previous_hash=1, proof=100)
+        if len(self.chain) == 0:
+            private_key = RSA.generate(2048)
+            f = open('private.pem', 'wb')
+            f.write(private_key.export_key('PEM'))
+            f.close()
+
+            public_key = private_key.publickey().export_key()
+            self.admin = public_key
+            self.new_block(previous_hash=1, proof=100)
+        else:
+            self.admin = self.chain[0]["admin"].encode()
 
     @staticmethod
     def hash(block):
@@ -125,7 +99,10 @@ class BlockChain(object):
         if current_candidate is None:
             return False, "Candidate is not present in the given vote"
 
-        signature_byte = binascii.unhexlify(transaction.signature)
+        try:
+            signature_byte = binascii.unhexlify(transaction.signature)
+        except:
+            signature_byte = transaction.signature
 
         self.validate_signature(voter['public_key'], signature_byte, transaction.generate_data())
 
@@ -282,19 +259,21 @@ class BlockChain(object):
 
         # grab and verify chains from all the nodes in our network
         for node in neighbours:
+            try:
+                # we utilize our own api to construct the list of chains :)
+                response = requests.get(f'http://{node}/chain')
 
-            # we utilize our own api to construct the list of chains :)
-            response = requests.get(f'http://{node}/chain')
+                if response.status_code == 200:
 
-            if response.status_code == 200:
+                    length = response.json()['length']
+                    chain = response.json()['chain']
 
-                length = response.json()['length']
-                chain = response.json()['chain']
-
-                # check if the chain is longer and whether the chain is valid
-                if length > max_length and self.valid_chain(chain):
-                    max_length = length
-                    new_chain = chain
+                    # check if the chain is longer and whether the chain is valid
+                    if length > max_length and self.valid_chain(chain):
+                        max_length = length
+                        new_chain = chain
+            except:
+                print(node)
 
         # replace our chain if we discover a new longer valid chain
         if new_chain:

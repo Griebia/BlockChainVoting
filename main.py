@@ -182,6 +182,13 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         defPort = sys.argv[1]
 
-    blockchain = BlockChain()
+    nodes = set()
+    for x in range(5001,5007):
+        if defPort == x:
+            continue
+        nodes.add("localhost:" + str(x))
+
+    print(nodes)
+    blockchain = BlockChain(nodes)
 
     app.run(host='0.0.0.0', port=defPort)
