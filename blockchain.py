@@ -27,7 +27,7 @@ class BlockChain(object):
 
             public_key = private_key.publickey().export_key()
             self.admin = public_key
-            self.new_block(previous_hash=1, proof=100)
+            self.new_block(previous_hash=1)
         else:
             self.admin = self.chain[0]["admin"].encode()
 
@@ -38,7 +38,7 @@ class BlockChain(object):
         block_string = json.dumps(block, sort_keys=True).encode()
         return hashlib.sha256(block_string).hexdigest()
 
-    def new_block(self, proof, previous_hash=None):
+    def new_block(self, previous_hash=None):
         # creates a new block in the blockchain
         block = {
             'admin': self.admin.decode("utf-8"),
@@ -47,7 +47,6 @@ class BlockChain(object):
             'voters': self.voters,
             'candidates': self.candidates,
             'transactions': self.current_transactions,
-            'proof': proof,
             'previous_hash': previous_hash or self.hash(self.chain[-1]),
             'started_voting': self.started_voting,
             'ended_voting': self.ended_voting,
@@ -111,9 +110,6 @@ class BlockChain(object):
             "receiver": transaction.receiver_address
         })
 
-        voter['voted'] = True
-        self.voters.append(voter)
-
         self.mine()
 
         return True, None
@@ -175,12 +171,10 @@ class BlockChain(object):
     def mine(self):
         # first we need to run the proof of work algorithm to calculate the new proof..
         last_block = self.last_block
-        last_proof = last_block['proof']
-        proof = self.proof_of_work(last_proof)
 
         # forge the new block by adding it to the chain
         previous_hash = self.hash(last_block)
-        block = self.new_block(proof, previous_hash)
+        block = self.new_block(previous_hash)
         self.inform_of_change()
         return block
 
@@ -239,8 +233,6 @@ class BlockChain(object):
             if block['previous_hash'] != self.hash(last_block):
                 return False
             # check that the proof of work is correct
-            if not self.validate_proof(last_block['proof'], block['proof']):
-                return False
 
             last_block = block
             current_index += 1
@@ -288,7 +280,11 @@ class BlockChain(object):
         # grab and verify chains from all the nodes in our network
         for node in neighbours:
             # we utilize our own api to construct the list of chains :)
-            response = requests.get(f'http://{node}/miner/nodes/resolve')
+            try:
+                response = requests.get(f'http://{node}/miner/nodes/resolve',timeout=0.05)
+            except requests.exceptions.ReadTimeout:
+                pass
+
 
         return False
 
@@ -304,17 +300,18 @@ class BlockChain(object):
         return transactions
 
     def get_all_voters(self):
-        voters = []
+        votersAll = []
         transactions = self.get_all_transactions()
         for block in self.chain:
             for voter in block['voters']:
+                curVoter = voter.copy()
                 if any(elem['sender'] == voter['wallet_address'] for elem in transactions):
-                    voter["voted"] = True
+                    curVoter["voted"] = True
                 else:
-                    voter["voted"] = False
-                voters.append(voter)
+                    curVoter["voted"] = False
+                votersAll.append(curVoter)
 
-        return voters
+        return votersAll
 
     def get_all_candidates(self):
         candidates = []

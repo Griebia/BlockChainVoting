@@ -111,36 +111,7 @@ class TestBlockChain(unittest.TestCase):
 
 
 
-    def test_add_transaction_to_be_voted_x_times(self):
-        nodes = set()
-        for x in range(5001, 5007):
-            nodes.add("localhost:" + str(x))
-        blockchain = BlockChain(nodes)
 
-        candidate_wallet = "Candidate1"
-
-        transactions = set()
-        for x in range(0,100):
-            private_key, public_key, wallet_address = blockchain.new_voter()
-            transaction = Transaction(wallet_address, candidate_wallet)
-            transaction.sign(private_key)
-
-            transactions.add(transaction)
-
-        blockchain.started_voting = True
-        times = set()
-        for transaction in transactions:
-            start = time.time()
-            blockchain.new_transaction(transaction)
-            end = time.time()
-            times.add(end - start)
-
-        with open('TimeResult.txt', 'w') as f:
-            for item in times:
-                f.write("%s\n" % item)
-
-        print(blockchain.get_all_transactions())
-        self.assertEqual(len(blockchain.get_all_transactions()), 10)
 
     @staticmethod
     def sign(data, private_key):
@@ -161,7 +132,7 @@ class TestCommunication(unittest.TestCase):
     def setUp(self):
         self.ctx = app.app_context()
         self.ctx.push()
-        self.client = app.test_client()
+        self.client = app.app_context()
 
     def tearDown(self):
         self.ctx.pop()
@@ -183,6 +154,37 @@ class TestCommunication(unittest.TestCase):
         assert len(candidate_counts) == 1
         assert response.status_code == 200
 
+    def test_add_transaction_to_be_voted_x_times(self):
+        import time
+        nodes = set()
+        for x in range(5001, 5007):
+            nodes.add("localhost:" + str(x))
+        blockchain = BlockChain(nodes)
+
+        candidate_wallet = "Candidate1"
+
+        transactions = set()
+        for x in range(0,4):
+            private_key, public_key, wallet_address = blockchain.new_voter()
+            transaction = Transaction(wallet_address, candidate_wallet)
+            transaction.sign(private_key)
+
+            transactions.add(transaction)
+
+        blockchain.started_voting = True
+        times = set()
+        for transaction in transactions:
+            start = time.time()
+            blockchain.new_transaction(transaction)
+            end = time.time()
+            times.add(end - start)
+
+        with open('TimeResult.txt', 'w') as f:
+            for item in times:
+                f.write("%s\n" % item)
+
+        print(blockchain.get_all_transactions())
+        self.assertEqual(len(blockchain.get_all_transactions()), 10)
 
 if __name__ == '__main__':
     unittest.main()

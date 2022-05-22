@@ -172,6 +172,47 @@ def candidate_result():
     }
     return jsonify(response), 200
 
+@app.route('/test', methods=['GET'])
+def test():
+    import time
+
+    candidate_wallet = "Candidate1"
+
+    transactions = set()
+    times = set()
+    for x in range(0, 1000):
+        start = time.time()
+        private_key, public_key, wallet_address = blockchain.new_voter()
+        end = time.time()
+        times.add(end - start)
+        transaction = Transaction(wallet_address, candidate_wallet)
+        transaction.sign(private_key)
+
+        transactions.add(transaction)
+
+    with open('TimeResult.txt', 'w') as f:
+        for item in times:
+            f.write("%s\n" % item)
+
+    blockchain.started_voting = True
+    times = set()
+    for transaction in transactions:
+        start = time.time()
+        blockchain.new_transaction(transaction)
+        end = time.time()
+        print(end - start)
+        times.add(end - start)
+
+    with open('TimeResult.txt', 'w') as f:
+        for item in times:
+            f.write("%s\n" % item)
+
+    print(blockchain.get_all_transactions())
+    response = {
+        'message': 'Results are returned',
+        'candidate_gotten_votes': blockchain.candidate_votes(),
+    }
+    return jsonify(response), 200
 
 
 
@@ -183,7 +224,7 @@ if __name__ == '__main__':
         defPort = sys.argv[1]
 
     nodes = set()
-    for x in range(5001,5007):
+    for x in range(5000,5007):
         if defPort == x:
             continue
         nodes.add("localhost:" + str(x))
