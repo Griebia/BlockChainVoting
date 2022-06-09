@@ -14,17 +14,14 @@ class BlockChain(object):
         self.ended_voting = False
 
         self.resolve_conflicts()
-        self.candidates.append({
-            "name": "Candidate1",
-            "wallet_address": "Candidate1"
-        })
+
         # create the genesis block
         if len(self.chain) == 0:
             private_key = RSA.generate(2048)
             f = open('private.pem', 'wb')
             f.write(private_key.export_key('PEM'))
             f.close()
-
+            print("Generated key")
             public_key = private_key.publickey().export_key()
             self.admin = public_key
             self.new_block(previous_hash=1)
@@ -73,7 +70,7 @@ class BlockChain(object):
     def new_transaction(self, transaction: Transaction):
         # adds a new transaction into the list of transactions
         # these transactions go into the next mined block
-        if not self.started_voting and self.ended_voting:
+        if not self.started_voting or self.ended_voting:
             return False, "The vote is not started or ended"
 
         current_voter = None
@@ -179,11 +176,13 @@ class BlockChain(object):
         return block
 
     def start_voting(self, signature: str, data: str):
-        signature_byte = binascii.unhexlify(signature)
-        self.validate_signature(self.admin, signature_byte, data.encode('utf-8'))
-        self.started_voting = True
-        self.mine()
-
+        if not self.ended_voting:
+            signature_byte = binascii.unhexlify(signature)
+            self.validate_signature(self.admin, signature_byte, data.encode('utf-8'))
+            self.started_voting = True
+            self.mine()
+        else:
+            return False
         return True
 
     def end_voting(self, signature: str, data: str):
@@ -289,7 +288,12 @@ class BlockChain(object):
         return False
 
     def candidate_votes(self):
-        return Counter(self.candidates)
+        results = [ item['receiver'] for item in self.get_all_transactions()]
+        count = Counter(results)
+        candidates = self.get_all_candidates().copy()
+        for candidate in candidates:
+            candidate['votes'] = count.get(candidate['wallet_address']) or 0
+        return candidates
 
     def get_all_transactions(self):
         transactions = []

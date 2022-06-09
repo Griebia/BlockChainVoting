@@ -4,8 +4,7 @@ from blockchain import *
 app = Flask(__name__)
 # generate a globally unique address for this node
 node_identifier = str(uuid4()).replace('-', '')
-# initiate the Blockchain
-blockchain = BlockChain()
+
 
 @app.route('/transaction/new', methods=['POST'])
 def new_transaction():
@@ -15,7 +14,7 @@ def new_transaction():
     if not all(k in values for k in required):
         return 'Missing values.', 400
 
-    if blockchain.started_voting and not blockchain.ended_voting:
+    if not blockchain.started_voting or blockchain.ended_voting:
         return 'Voting is not allowed now', 400
 
     # create a new transaction
@@ -88,6 +87,12 @@ def start_vote():
 
 
     result = blockchain.start_voting(values['signature'], values['data'])
+    if not result:
+        response = {
+            'message': f'Could not start the vote',
+        }
+        return jsonify(response, 400)
+
     response = {
         'message': f'Started the vote!',
     }
@@ -166,11 +171,8 @@ def consensus():
 
 @app.route('/candidate/results', methods=['GET'])
 def candidate_result():
-    response = {
-        'message': 'Results are returned',
-        'candidate_gotten_votes': blockchain.candidate_votes(),
-    }
-    return jsonify(response), 200
+    print(blockchain.candidate_votes())
+    return jsonify(blockchain.candidate_votes())
 
 @app.route('/test', methods=['GET'])
 def test():
@@ -217,19 +219,19 @@ def test():
 
 
 if __name__ == '__main__':
-    defPort = 5000
+    defPort = str(5000)
     mainNodePassword = "Node"
 
     if len(sys.argv) > 1:
         defPort = sys.argv[1]
 
     nodes = set()
-    for x in range(5000,5007):
-        if defPort == x:
+    for x in range(5000,5003):
+        if defPort == str(x):
             continue
         nodes.add("localhost:" + str(x))
-
     print(nodes)
+
     blockchain = BlockChain(nodes)
 
     app.run(host='0.0.0.0', port=defPort)
